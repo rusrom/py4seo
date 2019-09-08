@@ -1,17 +1,21 @@
 from requests_html import HTMLSession
 from random import choice
 from queue import Queue
+from threading import Lock
 from concurrent.futures import ThreadPoolExecutor
 
 
 target_domain = 'http://seoshnik.top/'
+locker = Lock()
 session = HTMLSession()
 scaned_urls = set()
 
 def worker(queue):
+    global scaned_urls
     while not queue.empty():
         try:
             url = queue.get()
+
             if url in scaned_urls:
                 continue
 
@@ -19,10 +23,12 @@ def worker(queue):
             response = session.get(url)
 
             # Add url to scaned_urs set
-            scaned_urls.add(url)
+            with locker:
+                scaned_urls.add(url)
 
             title = response.html.xpath('//title/text()')[0]
-            print(title.strip() + '\n' + url)
+            # print(title.strip() + '\n' + url)
+            print(title.strip())
 
             # Get all page links
             all_page_links = response.html.absolute_links
@@ -33,10 +39,11 @@ def worker(queue):
 
             # Add ONLY not scaned links
             # https://stackoverflow.com/a/14545264
-            [queue.put(link) for link in all_page_links if link not in scaned_urls and target_domain in link]
+            with locker:
+                [queue.put(link) for link in all_page_links if link not in scaned_urls and target_domain in link]
 
-        except:
-            print('New request!')
+        except Exception as e:
+            print('New request!', e)
 
 
 def main():
@@ -48,7 +55,8 @@ def main():
     scaned_urls.add(target_domain)
 
     title = r.html.xpath('//title/text()')[0]
-    print(title.strip() + '\n' + target_domain)
+    # print(title.strip() + '\n' + target_domain)
+    print(title.strip())
 
     all_links = r.html.absolute_links
 
