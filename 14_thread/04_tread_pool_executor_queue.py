@@ -6,15 +6,17 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 target_domain = 'http://seoshnik.top/'
+queue = Queue()
 locker = Lock()
 session = HTMLSession()
 scaned_urls = set()
 
-def worker(queue):
+def worker():
     global scaned_urls
     while not queue.empty():
         try:
-            url = queue.get()
+            with locker:
+                url = queue.get()
 
             if url in scaned_urls:
                 continue
@@ -47,8 +49,6 @@ def worker(queue):
 
 
 def main():
-    queue = Queue()
-
     r = session.get(target_domain)
 
     # Add url to scaned_urs set
@@ -70,7 +70,7 @@ def main():
 
     with ThreadPoolExecutor(max_workers=10) as pool:
         for _ in range(10):
-            pool.submit(worker, queue)
+            pool.submit(worker)
 
 
 if __name__ == "__main__":
