@@ -46,10 +46,10 @@ def worker():
             all_page_links = response.html.absolute_links
 
             with locker:
-                with open('res_treads.csv', 'a') as f:
-                    f.write(title.strip() + '\n')
+                # with open('res_treads.csv', 'a') as f:
+                #     f.write(title.strip() + '\n')
                 
-                # db.insert([{'title': title.strip(), 'url': url}])
+                db.insert([{'title': title.strip(), 'url': url}])
                 add_to_queue(all_page_links)
 
         except Exception as e:
