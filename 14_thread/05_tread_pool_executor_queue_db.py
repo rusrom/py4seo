@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
 from random import choice
 from threading import Lock
+from pprint import pprint
 
 from requests_html import HTMLSession
 
@@ -15,36 +16,41 @@ locker = Lock()
 session = HTMLSession()
 scaned_urls = set()
 
+
+def add_to_queue(links):
+    # for link in links:
+    #     if link not in scaned_urls and target_domain in link:
+    #         scaned_urls.add(link)
+    #         queue.put(link)
+
+    # Equvivalent realization:
+    # Add to queue ONLY not scaned links
+    # https://stackoverflow.com/a/14545264
+    [
+        (scaned_urls.add(link), queue.put(link))
+        for link in links
+        if link not in scaned_urls and target_domain in link
+    ]
+
+
 def worker():
-    global scaned_urls
-    # while not queue.empty():
-    while queue.qsize():
+    while not queue.empty():
+    # while queue.qsize():
+
+        url = queue.get()
+
         try:
-            url = queue.get()
-
-            if url in scaned_urls:
-                continue
-
-            # Wait by default 30sec / Wait 2 sec and send new request session.get(url, timeout=2)
             response = session.get(url)
 
             title = response.html.xpath('//title/text()')[0]
-
-            with locker:
-                # Add url to scaned_urs set
-                scaned_urls.add(url)
-
-                # with open('res_treads_2.txt', 'a') as f:
-                #     f.write(title.strip() + '\n')
-
-                db.insert([{'title': title.strip(), 'url': url}])
-
-            # Set of all page links
             all_page_links = response.html.absolute_links
 
-            # Add to queue ONLY not scaned links
-            # https://stackoverflow.com/a/14545264
-            [queue.put(link) for link in all_page_links if link not in scaned_urls and target_domain in link]
+            with locker:
+                with open('res_treads.csv', 'a') as f:
+                    f.write(title.strip() + '\n')
+                
+                # db.insert([{'title': title.strip(), 'url': url}])
+                add_to_queue(all_page_links)
 
         except Exception as e:
             print('New request!', e)
@@ -52,17 +58,9 @@ def worker():
 
 def main():
     r = session.get(target_domain)
-
-    # Add url to scaned_urs set
-    scaned_urls.add(target_domain)
-
-    title = r.html.xpath('//title/text()')[0]
-
     all_links = r.html.absolute_links
 
-    # Add to queue ONLY not scaned links
-    # https://stackoverflow.com/a/14545264
-    [queue.put(link) for link in all_links if link not in scaned_urls and target_domain in link]
+    add_to_queue(all_links)
 
     with ThreadPoolExecutor(max_workers=10) as executor:
         for _ in range(10):
